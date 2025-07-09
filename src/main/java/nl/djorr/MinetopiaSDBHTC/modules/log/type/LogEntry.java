@@ -1,4 +1,4 @@
-package nl.djorr.MinetopiaSDBHTC.log.type;
+package nl.djorr.MinetopiaSDBHTC.modules.log.type;
 
 import lombok.AllArgsConstructor;
 import lombok.Data;

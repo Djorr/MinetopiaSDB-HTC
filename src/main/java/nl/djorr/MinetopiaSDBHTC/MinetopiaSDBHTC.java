@@ -1,8 +1,8 @@
 package nl.djorr.MinetopiaSDBHTC;
 
 import nl.djorr.MinetopiaSDBHTC.command.SdbHtcCommand;
-import nl.djorr.MinetopiaSDBHTC.log.LogModule;
-import nl.djorr.MinetopiaSDBHTC.balance.BalanceModule;
+import nl.djorr.MinetopiaSDBHTC.modules.log.LogModule;
+import nl.djorr.MinetopiaSDBHTC.modules.balance.BalanceModule;
 import nl.djorr.MinetopiaSDBHTC.util.LogMenuListener;
 import org.bstats.bukkit.Metrics;
 import org.bukkit.plugin.java.JavaPlugin;

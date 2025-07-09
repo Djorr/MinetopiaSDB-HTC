@@ -1,12 +1,12 @@
-package nl.djorr.MinetopiaSDBHTC.log;
+package nl.djorr.MinetopiaSDBHTC.modules.log;
 
 import com.google.gson.*;
 import com.google.gson.reflect.TypeToken;
-import nl.djorr.MinetopiaSDBHTC.log.object.PlayerLog;
-import nl.djorr.MinetopiaSDBHTC.log.type.BalanceLogEntry;
-import nl.djorr.MinetopiaSDBHTC.log.type.LogEntry;
-import nl.djorr.MinetopiaSDBHTC.log.type.PlayerLogType;
-import nl.djorr.MinetopiaSDBHTC.module.Module;
+import nl.djorr.MinetopiaSDBHTC.modules.log.object.PlayerLog;
+import nl.djorr.MinetopiaSDBHTC.modules.log.type.BalanceLogEntry;
+import nl.djorr.MinetopiaSDBHTC.modules.log.type.LogEntry;
+import nl.djorr.MinetopiaSDBHTC.modules.log.type.PlayerLogType;
+import nl.djorr.MinetopiaSDBHTC.modules.Module;
 import org.bukkit.Bukkit;
 import org.bukkit.OfflinePlayer;
 import org.bukkit.Location;
@@ -205,7 +205,7 @@ public class LogModule implements Module {
             if (log == null) continue;
             List<?> toArchive = new ArrayList<>();
             LocalDateTime cutoff = LocalDateTime.now().minusHours(24);
-            for (nl.djorr.MinetopiaSDBHTC.log.type.BalanceLogEntry entry : log.getBalanceLogs()) {
+            for (nl.djorr.MinetopiaSDBHTC.modules.log.type.BalanceLogEntry entry : log.getBalanceLogs()) {
                 if (entry.getTimestamp().isBefore(cutoff)) {
                     ((List)toArchive).add(entry);
                 }

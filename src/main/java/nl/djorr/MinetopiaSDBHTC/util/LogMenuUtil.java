@@ -1,12 +1,13 @@
 package nl.djorr.MinetopiaSDBHTC.util;
 
-import nl.djorr.MinetopiaSDBHTC.log.type.BalanceLogEntry;
-import nl.djorr.MinetopiaSDBHTC.log.type.PlayerLogType;
+import nl.djorr.MinetopiaSDBHTC.modules.log.type.BalanceLogEntry;
+import nl.djorr.MinetopiaSDBHTC.modules.log.type.PlayerLogType;
 import nl.minetopiasdb.api.banking.BankUtils;
 import nl.minetopiasdb.api.banking.Bankaccount;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.Material;
+import org.bukkit.OfflinePlayer;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
@@ -109,9 +110,7 @@ public class LogMenuUtil {
         for (PlayerLogType type : PlayerLogType.values()) {
             List<BalanceLogEntry> logs = nl.djorr.MinetopiaSDBHTC.MinetopiaSDBHTC.getInstance().getBalanceModule().getLogsOfType(spelerNaam, type, 24);
             all.addAll(logs);
-            System.out.println("[MinetopiaSDB-HTC] Found " + logs.size() + " logs of type " + type + " for " + spelerNaam);
         }
-        System.out.println("[MinetopiaSDB-HTC] Total logs found for " + spelerNaam + ": " + all.size());
         return all;
     }
 
@@ -138,57 +137,25 @@ public class LogMenuUtil {
             spelerName = offlinePlayer.getName() != null ? offlinePlayer.getName() : "Onbekend";
         }
         String speler = "§e" + spelerName + "§7";
+
+        OfflinePlayer targetPlayer = null;
+        if (entry.getTarget() != null) {
+            targetPlayer = Bukkit.getOfflinePlayer(entry.getTarget());
+        }
         switch (type) {
             case BALANCE:
                 String rekeningNaam;
+                if (entry.getBankaccount() == null) {
+                    lore.add(speler + " §7heeft een bank-actie uitgevoerd:");
+                    lore.add("§7" + entry.getActie());
+                    lore.add("");
+                    lore.add("§7Oud saldo: §c€" + formatAmount(entry.getOudSaldo()));
+                    lore.add("§7Nieuw saldo: §a€" + formatAmount(entry.getNieuwSaldo()));
+                    break;
+                }
                 switch (entry.getBankaccount().getType()) {
                     case PERSONAL: {
                         rekeningNaam = "§aPrivérekening";
-
-                        double bedrag = Math.abs(entry.getNieuwSaldo() - entry.getOudSaldo());
-                        String changedAmount;
-                        if (entry.getNieuwSaldo() > entry.getOudSaldo()) {
-                            changedAmount = "§e(+€" + formatAmount(bedrag);
-                            lore.add(speler + " heeft §a+§a€" + formatAmount(bedrag) + "§7 gestort op " + rekeningNaam + ".");
-                        } else {
-                            changedAmount = "§e(-€" + formatAmount(bedrag);
-                            lore.add(speler + " heeft §c-§c€" + formatAmount(bedrag) + " §7opgenomen van " + rekeningNaam + ".");
-                        }
-
-                        lore.add("");
-                        lore.add("§fRekening gegevens:");
-                        lore.add("§7Naam: §f" + rekeningNaam + " §8(ID: " + entry.getBankaccount().getId() + ")");
-                        lore.add("§7Oud saldo: §c€" + formatAmount(entry.getOudSaldo()));
-                        lore.add("§7Nieuw saldo: §a€" + formatAmount(entry.getNieuwSaldo()) + " " + changedAmount);
-                        break;
-                    }
-                    case SAVINGS: {
-                        rekeningNaam = "§eSpaarrekening";
-
-                        double bedrag = Math.abs(entry.getNieuwSaldo() - entry.getOudSaldo());
-                        String changedAmount;
-                        if (entry.getNieuwSaldo() > entry.getOudSaldo()) {
-                            changedAmount = "§e(+€" + formatAmount(bedrag);
-                            lore.add(speler + " heeft §a+§a€" + formatAmount(bedrag) + "§7 gestort op " + rekeningNaam + ".");
-                        } else {
-                            changedAmount = "§e(-€" + formatAmount(bedrag);
-                            lore.add(speler + " heeft §c-§c€" + formatAmount(bedrag) + " §7opgenomen van " + rekeningNaam + ".");
-                        }
-
-                        lore.add("");
-                        lore.add("§fRekening gegevens:");
-                        lore.add("§7Naam: §f" + rekeningNaam + " §8(ID: " + entry.getBankaccount().getId() + ")");
-                        lore.add("§7Oud saldo: §c€" + formatAmount(entry.getOudSaldo()));
-                        lore.add("§7Nieuw saldo: §a€" + formatAmount(entry.getNieuwSaldo()) + " " + changedAmount);
-                        break;
-                    }
-                    case BUSINESS: {
-                        rekeningNaam = "§bBedrijfsrekening";
-
-                        final Bankaccount bankaccount = BankUtils.getInstance().getBankAccount(entry.getBankaccount().getId());
-                        if (bankaccount != null) {
-                            rekeningNaam = bankaccount.getName() != null ? bankaccount.getName() + " §bBedrijfsrekening" : "§bBedrijfsrekening";
-                        }
 
                         double bedrag = Math.abs(entry.getNieuwSaldo() - entry.getOudSaldo());
                         String changedAmount;
@@ -202,9 +169,58 @@ public class LogMenuUtil {
 
                         lore.add("");
                         lore.add("§fRekening gegevens:");
-                        lore.add("§7Naam: §f" + rekeningNaam + " §8(ID: " + entry.getBankaccount().getId() + ")");
+                        lore.add("§7Naam: §2" + rekeningNaam + " §8(ID: " + entry.getBankaccount().getId() + ")");
                         lore.add("§7Oud saldo: §c€" + formatAmount(entry.getOudSaldo()));
                         lore.add("§7Nieuw saldo: §a€" + formatAmount(entry.getNieuwSaldo()) + " " + changedAmount);
+                        break;
+                    }
+                    case SAVINGS: {
+                        rekeningNaam = "§eSpaarrekening";
+
+                        double bedrag = Math.abs(entry.getNieuwSaldo() - entry.getOudSaldo());
+                        String changedAmount;
+                        if (entry.getNieuwSaldo() > entry.getOudSaldo()) {
+                            changedAmount = "§e+€" + formatAmount(bedrag);
+                            lore.add(speler + " heeft §a+§a€" + formatAmount(bedrag) + "§7 gestort.");
+                        } else {
+                            changedAmount = "§e-€" + formatAmount(bedrag);
+                            lore.add(speler + " heeft §c-§c€" + formatAmount(bedrag) + " §7opgenomen.");
+                        }
+
+                        lore.add("");
+                        lore.add("§fRekening gegevens:");
+                        lore.add("§7Naam: §6" + rekeningNaam + " §8(ID: " + entry.getBankaccount().getId() + ")");
+                        lore.add("§7Oud saldo: §c€" + formatAmount(entry.getOudSaldo()));
+                        lore.add("§7Nieuw saldo: §a€" + formatAmount(entry.getNieuwSaldo()) + " &e(" + changedAmount + ")");
+                        break;
+                    }
+                    case BUSINESS: {
+                        rekeningNaam = "§bBedrijfsrekening";
+
+                        final Bankaccount bankaccount = BankUtils.getInstance().getBankAccount(entry.getBankaccount().getId());
+                        if (bankaccount != null) {
+                            if (bankaccount.getName() != null && bankaccount.getName().contains("ID")) {
+                                rekeningNaam = "§3Bedrijfsrekening";
+                            } else {
+                                rekeningNaam = bankaccount.getName() + " §3Bedrijfsrekening";
+                            }
+                        }
+
+                        double bedrag = Math.abs(entry.getNieuwSaldo() - entry.getOudSaldo());
+                        String changedAmount;
+                        if (entry.getNieuwSaldo() > entry.getOudSaldo()) {
+                            changedAmount = "§e+€" + formatAmount(bedrag);
+                            lore.add(speler + " heeft §a+§a€" + formatAmount(bedrag) + "§7 gestort.");
+                        } else {
+                            changedAmount = "§e-€" + formatAmount(bedrag);
+                            lore.add(speler + " heeft §c-§c€" + formatAmount(bedrag) + " §7opgenomen.");
+                        }
+
+                        lore.add("");
+                        lore.add("§fRekening gegevens:");
+                        lore.add("§7Naam: §b" + rekeningNaam + " §8(ID: " + entry.getBankaccount().getId() + ")");
+                        lore.add("§7Oud saldo: §c€" + formatAmount(entry.getOudSaldo()));
+                        lore.add("§7Nieuw saldo: §a€" + formatAmount(entry.getNieuwSaldo()) + " &e(" + changedAmount + ")");
                         break;
                     }
                     case GOVERNMENT: {
@@ -218,18 +234,18 @@ public class LogMenuUtil {
                         double bedrag = Math.abs(entry.getNieuwSaldo() - entry.getOudSaldo());
                         String changedAmount;
                         if (entry.getNieuwSaldo() > entry.getOudSaldo()) {
-                            changedAmount = "§e(+€" + formatAmount(bedrag);
-                            lore.add(speler + " heeft §a+§a€" + formatAmount(bedrag) + "§7 gestort op " + rekeningNaam + ".");
+                            changedAmount = "§e+€" + formatAmount(bedrag);
+                            lore.add(speler + " heeft §a+§a€" + formatAmount(bedrag) + "§7 gestort.");
                         } else {
-                            changedAmount = "§e(-€" + formatAmount(bedrag);
-                            lore.add(speler + " heeft §c-§c€" + formatAmount(bedrag) + " §7opgenomen van " + rekeningNaam + ".");
+                            changedAmount = "§e-€" + formatAmount(bedrag);
+                            lore.add(speler + " heeft §c-§c€" + formatAmount(bedrag) + " §7opgenomen.");
                         }
 
                         lore.add("");
                         lore.add("§fRekening gegevens:");
-                        lore.add("§7Naam: §f" + rekeningNaam + " §8(ID: " + entry.getBankaccount().getId() + ")");
+                        lore.add("§7Naam: §c" + rekeningNaam + " §8(ID: " + entry.getBankaccount().getId() + ")");
                         lore.add("§7Oud saldo: §c€" + formatAmount(entry.getOudSaldo()));
-                        lore.add("§7Nieuw saldo: §a€" + formatAmount(entry.getNieuwSaldo()) + " " + changedAmount);
+                        lore.add("§7Nieuw saldo: §a€" + formatAmount(entry.getNieuwSaldo()) + " &e(" + changedAmount + ")");
                         break;
                     }
                 }
@@ -248,10 +264,6 @@ public class LogMenuUtil {
                 lore.add(speler + " heeft §e" + entry.getItemAmount() + "x §e€" + perStukStr + " §fwit geld§7 " + actie + ".");
                 lore.add("§7Totale waarde: " + kleur + prefix + "€" + totaalStr);
                 lore.add("");
-                lore.add("§fInventory:");
-                lore.add("§7Voor: §c€" + formatAmount(entry.getOudSaldo()) + "§7");
-                lore.add("§7Na: §a€" + formatAmount(entry.getNieuwSaldo()) + " §e(" + prefix + "€" + totaalStr + ")");
-                lore.add("");
 
                 if (entry.getLocation() != null) {
                     lore.add("§bLocatie: §fx" + entry.getLocation().getBlockX() + " y" + entry.getLocation().getBlockY() + " z" + entry.getLocation().getBlockZ() + " " + entry.getLocation().getWorld().getName());
@@ -265,12 +277,22 @@ public class LogMenuUtil {
                 lore.addAll(splitLoreLines("§7" + entry.getActie()));
                 break;
             case ESS_ECONOMY:
+                double bedrag = Math.abs(entry.getNieuwSaldo() - entry.getOudSaldo());
+                String changedAmount;
+                if (entry.getNieuwSaldo() > entry.getOudSaldo()) {
+                    changedAmount = "§e+€" + formatAmount(bedrag);
+                } else {
+                    changedAmount = "§e-€" + formatAmount(bedrag);
+                }
+
                 lore.add(speler + " §7heeft een Essentials Economy-actie uitgevoerd:");
                 lore.add(speler + " §7heeft " + entry.getActie());
                 lore.add("");
-                lore.add(entry.getTarget() + " rekening gegevens:");
+                if (targetPlayer != null) {
+                    lore.add("§f" + targetPlayer.getName() + " rekening gegevens:");
+                }
                 lore.add("§7Oud saldo: §c€" + formatAmount(entry.getOudSaldo()));
-                lore.add("§7Nieuw saldo: §a€" + formatAmount(entry.getNieuwSaldo()) + " §e(" + formatAmount(entry.getAmount()) + ")");
+                lore.add("§7Nieuw saldo: §a€" + formatAmount(entry.getNieuwSaldo()) + " §e(" + changedAmount + ")");
                 break;
         }
         return lore;

@@ -1,4 +1,4 @@
-package nl.djorr.MinetopiaSDBHTC.log.type;
+package nl.djorr.MinetopiaSDBHTC.modules.log.type;
 
 import lombok.*;
 
@@ -6,7 +6,6 @@ import java.time.LocalDateTime;
 import java.util.UUID;
 
 import nl.minetopiasdb.api.banking.Bankaccount;
-import nl.minetopiasdb.api.enums.BankAccountType;
 import org.bukkit.Location;
 
 @Setter

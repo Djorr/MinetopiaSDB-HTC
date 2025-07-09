@@ -16,6 +16,40 @@ public class BalanceUtils {
         return NBTEditor.contains(item, "sdb_realmoney");
     }
 
+    public static double getAantalTotaalWitGeldWaarde(Player player) {
+        if (player == null) return 0.0;
+        
+        double totaalWaarde = 0.0;
+        
+        // Check main inventory (slots 0-35)
+        for (ItemStack item : player.getInventory().getContents()) {
+            if (item != null && isWitGeld(item)) {
+                int waardePerStuk = getWitGeldWaarde(item);
+                int aantal = item.getAmount();
+                totaalWaarde += waardePerStuk * aantal;
+            }
+        }
+        
+        // Check armor slots (helmet, chestplate, leggings, boots)
+        for (ItemStack item : player.getInventory().getArmorContents()) {
+            if (item != null && isWitGeld(item)) {
+                int waardePerStuk = getWitGeldWaarde(item);
+                int aantal = item.getAmount();
+                totaalWaarde += waardePerStuk * aantal;
+            }
+        }
+        
+        // Check offhand slot (shield, etc.)
+        ItemStack offhand = player.getInventory().getItemInOffHand();
+        if (offhand != null && isWitGeld(offhand)) {
+            int waardePerStuk = getWitGeldWaarde(offhand);
+            int aantal = offhand.getAmount();
+            totaalWaarde += waardePerStuk * aantal;
+        }
+        
+        return totaalWaarde;
+    }
+
     public static int getWitGeldWaarde(ItemStack item) {
         if (item == null || !isWitGeld(item)) return 0;
         Material type = item.getType();

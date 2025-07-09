@@ -1,10 +1,9 @@
 package nl.djorr.MinetopiaSDBHTC.command;
 
 import nl.djorr.MinetopiaSDBHTC.MinetopiaSDBHTC;
-import nl.djorr.MinetopiaSDBHTC.balance.BalanceModule;
-import nl.djorr.MinetopiaSDBHTC.log.type.BalanceLogEntry;
-import nl.djorr.MinetopiaSDBHTC.log.type.PlayerLogType;
-import nl.djorr.MinetopiaSDBHTC.util.BalanceUtils;
+import nl.djorr.MinetopiaSDBHTC.modules.balance.BalanceModule;
+import nl.djorr.MinetopiaSDBHTC.modules.log.type.BalanceLogEntry;
+import nl.djorr.MinetopiaSDBHTC.modules.log.type.PlayerLogType;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
@@ -20,8 +19,7 @@ public class SdbHtcCommand implements CommandExecutor {
     private static final int HELP_PER_PAGE = 5;
     private static final String[][] HELP_PAGES = {
         {
-            "§e/sdbhtc balhistory <speler> [type] [pagina]§7 - Bekijk de historie van een speler. Type kan balance, pickup, drop, inventory, ess_economy zijn.",
-            "§e/sdbhtc help [pagina]§7 - Toon deze help.",
+            "§e/sdbhtc balhistory <speler>§7 - Bekijk de historie van een speler.",
         }
     };
 
@@ -89,8 +87,9 @@ public class SdbHtcCommand implements CommandExecutor {
             return;
         }
         String spelerNaam = args[1];
-        PlayerLogType type = PlayerLogType.BALANCE;
+        PlayerLogType type = PlayerLogType.ALL; // Default to ALL
         int pagina = 1;
+        
         BalanceModule balanceModule = MinetopiaSDBHTC.getInstance().getBalanceModule();
         List<BalanceLogEntry> logs = balanceModule.getLogsOfType(spelerNaam, type, 24);
         LogMenuUtil.openLogMenu(player, spelerNaam, logs, type, pagina);

@@ -1,4 +1,4 @@
-package nl.djorr.MinetopiaSDBHTC.module;
+package nl.djorr.MinetopiaSDBHTC.modules;
 
 import org.bukkit.plugin.Plugin;
 
