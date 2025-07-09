@@ -1,0 +1,37 @@
+name: MinetopiaSDB-HTC
+main: nl.djorr.MinetopiaSDBHTC.MinetopiaSDBHTC
+version: 1.0.0
+author: Djorr
+description: HTC logging plugin voor MinetopiaSDB
+api-version: 1.12
+depends:
+  - Vault
+  - Essentials
+  - MinetopiaSDBRel
+commands:
+  sdbhtc:
+    description: Hoofdcommando voor MinetopiaSDB-HTC
+    usage: /<command> balhistory <speler> [pagina] | /<command> balhis <speler> [pagina]
+    aliases: [balhistory, balhis]
+    permission: minetopiasdbhtc.command
+    permission-message: §cJe hebt geen permissie om dit commando te gebruiken.
+    permissions:
+      minetopiasdbhtc.command.balhistory:
+        description: Gebruik balhistory subcommando
+        default: op
+        children:
+          minetopiasdbhtc.command: true
+      minetopiasdbhtc.command.balhis:
+        description: Gebruik balhis subcommando
+        default: op
+        children:
+          minetopiasdbhtc.command: true
+      minetopiasdbhtc.teleportlog:
+        description: Sta teleporteren naar loglocaties toe via het logmenu
+        default: false
+        permission-message: §cJe hebt geen permissie om naar deze locatie te teleporteren.
+    help:
+      description: Toon hulp voor MinetopiaSDB-HTC
+      usage: /sdbhtc help [pagina]
+      permission: minetopiasdbhtc.command.help
+      permission-message: §cJe hebt geen permissie om de help te bekijken. 
