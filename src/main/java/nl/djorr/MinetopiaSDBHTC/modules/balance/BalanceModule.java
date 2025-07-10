@@ -34,7 +34,7 @@ public class BalanceModule implements Module {
     private final LogModule logModule;
     private Plugin plugin;
 
-    private static final BlockingQueue<String> discordWebhookQueue = new LinkedBlockingQueue<>();
+    private static final BlockingQueue<String> discordWebhookQueue = new LinkedBlockingQueue<>(100); // Maximum 100 berichten
     private static volatile boolean discordWorkerStarted = false;
 
     public BalanceModule(LogModule logModule) {
@@ -60,7 +60,7 @@ public class BalanceModule implements Module {
         plugin.getServer().getScheduler().runTaskAsynchronously(plugin, () -> {
             while (true) {
                 try {
-                    String json = discordWebhookQueue.poll(1500, TimeUnit.MILLISECONDS); // 1.5s tussen berichten
+                    String json = discordWebhookQueue.poll(5000, TimeUnit.MILLISECONDS); // 5s tussen berichten
                     if (json != null) {
                         sendDiscordWebhookRaw(json);
                     }
@@ -82,8 +82,18 @@ public class BalanceModule implements Module {
             conn.setDoOutput(true);
             byte[] out = json.getBytes(StandardCharsets.UTF_8);
             conn.getOutputStream().write(out);
+            int responseCode = conn.getResponseCode();
             conn.getInputStream().close();
             conn.disconnect();
+            
+            // Als we rate limited zijn, wacht langer en probeer niet opnieuw
+            if (responseCode == 429) {
+                System.out.println("[MinetopiaSDB-HTC] Discord rate limited, skipping webhook for 60 seconds");
+                // Wacht 60 seconden voordat we weer proberen
+                Thread.sleep(60000);
+            } else if (responseCode != 200 && responseCode != 204) {
+                System.out.println("[MinetopiaSDB-HTC] Fout bij versturen log naar Discord webhook: Server returned HTTP response code: " + responseCode);
+            }
         } catch (Exception e) {
             System.out.println("[MinetopiaSDB-HTC] Fout bij versturen log naar Discord webhook: " + e.getMessage());
         }
@@ -92,13 +102,8 @@ public class BalanceModule implements Module {
     private void sendLogToDiscord(BalanceLogEntry entry) {
         String webhookUrl = ConfigModule.getInstance().getWebhookUrl();
         if (webhookUrl == null || webhookUrl.isEmpty()) return;
-        // Tagging logica
-        boolean tagRole = false;
-        String roleId = ConfigModule.getInstance().getWhitelistgeldRole();
-        // Tag staff als bedrag (abs) >= 50000 euro
-        if (Math.abs(entry.getAmount()) >= 50000 && roleId != null && !roleId.isEmpty()) tagRole = true;
+        // Tagging logica volledig verwijderd
         StringBuilder content = new StringBuilder();
-        if (tagRole) content.append(roleId).append(" ");
         // Spelernaam ophalen
         String spelerNaam = "Onbekend";
         if (entry.getSpeler() != null) {
@@ -125,7 +130,7 @@ public class BalanceModule implements Module {
         StringBuilder desc = new StringBuilder();
         DateTimeFormatter tijdFormatter = DateTimeFormatter.ofPattern("HH:mm:ss");
         DateTimeFormatter datumFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
-        int color = 0x4FC3F7; // default: licht blauw
+        int color = 0x4FC3F7;
         switch (entry.getLogType()) {
             case PICKUP:
             case DROP:
@@ -245,16 +250,13 @@ public class BalanceModule implements Module {
                 "\"description\": " + escapeJson(desc.toString()) + "," +
                 "\"color\": " + color +
                 "}]}";
-        String json;
-        if (content.length() > 0) {
-            json = "{\"content\": " + escapeJson(content.toString()) + "," + embedJson.substring(1);
-        } else {
-            json = embedJson;
-        }
+        String json = embedJson;
         // Start de worker als die nog niet draait
         startDiscordWebhookWorker();
         // Voeg bericht toe aan de queue
-        discordWebhookQueue.offer(json);
+        if (!discordWebhookQueue.offer(json)) {
+            System.out.println("[MinetopiaSDB-HTC] Discord webhook queue is vol, bericht wordt overgeslagen");
+        }
     }
 
     private String escapeJson(String s) {

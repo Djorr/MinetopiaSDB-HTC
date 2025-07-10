@@ -120,9 +120,13 @@ public class LogModule implements Module {
                     if (entry.getValue() != null && !entry.getValue().isEmpty()) {
                         JsonArray array = new JsonArray();
                         for (LogEntry logEntry : entry.getValue()) {
-                            array.add(context.serialize(logEntry));
+                            if (logEntry != null) { // null-check toegevoegd
+                                array.add(context.serialize(logEntry));
+                            }
                         }
-                        obj.add(entry.getKey().name(), array);
+                        if (array.size() > 0) {
+                            obj.add(entry.getKey().name(), array);
+                        }
                     }
                 }
                 return obj;
@@ -220,7 +224,7 @@ public class LogModule implements Module {
     public void saveAll() {
         for (UUID uuid : playerLogs.keySet()) {
             try {
-                savePlayerLog(uuid);
+            savePlayerLog(uuid);
             } catch (Exception e) {
                 e.printStackTrace();
             }
