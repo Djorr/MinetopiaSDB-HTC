@@ -1,0 +1,11 @@
+<component name="libraryTable">
+  <library name="libs">
+    <CLASSES>
+      <root url="jar://$PROJECT_DIR$/libs/EssentialsX-2.21.1.jar!/" />
+      <root url="jar://$PROJECT_DIR$/libs/Vault.jar!/" />
+      <root url="jar://$PROJECT_DIR$/libs/MinetopiaSDBRel-2.7.2.jar!/" />
+    </CLASSES>
+    <JAVADOC />
+    <SOURCES />
+  </library>
+</component>

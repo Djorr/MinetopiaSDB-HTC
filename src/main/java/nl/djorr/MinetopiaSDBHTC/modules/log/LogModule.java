@@ -7,6 +7,8 @@ import nl.djorr.MinetopiaSDBHTC.modules.log.type.BalanceLogEntry;
 import nl.djorr.MinetopiaSDBHTC.modules.log.type.LogEntry;
 import nl.djorr.MinetopiaSDBHTC.modules.log.type.PlayerLogType;
 import nl.djorr.MinetopiaSDBHTC.modules.Module;
+import nl.minetopiasdb.api.banking.Bankaccount;
+import nl.minetopiasdb.api.banking.BankUtils;
 import org.bukkit.Bukkit;
 import org.bukkit.OfflinePlayer;
 import org.bukkit.Location;
@@ -20,7 +22,10 @@ import java.util.*;
 import java.util.zip.GZIPOutputStream;
 import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
 import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream;
+import nl.djorr.MinetopiaSDBHTC.modules.config.ConfigModule;
+import lombok.Getter;
 
+@Getter
 public class LogModule implements Module {
     private final Map<UUID, PlayerLog> playerLogs = new HashMap<>();
     private final Gson gson;
@@ -31,16 +36,47 @@ public class LogModule implements Module {
         // Custom Gson met type adapters voor abstracte klassen
         GsonBuilder builder = new GsonBuilder().setPrettyPrinting();
         
-        // Custom type adapter voor LogEntry (abstracte klasse)
-        builder.registerTypeAdapter(LogEntry.class, new JsonDeserializer<LogEntry>() {
+        // Register custom serializer/deserializer for BalanceLogEntry
+        builder.registerTypeAdapter(BalanceLogEntry.class, new BalanceLogEntry.Serializer());
+        builder.registerTypeAdapter(BalanceLogEntry.class, new BalanceLogEntry.Deserializer());
+        
+        // Custom type adapter voor Bankaccount
+        builder.registerTypeAdapter(Bankaccount.class, new JsonSerializer<Bankaccount>() {
             @Override
-            public LogEntry deserialize(JsonElement json, Type typeOfT, JsonDeserializationContext context) throws JsonParseException {
-                JsonObject jsonObject = json.getAsJsonObject();
-                String logTypeStr = jsonObject.get("logType") != null ? jsonObject.get("logType").getAsString() : "BALANCE";
-                PlayerLogType logType = PlayerLogType.valueOf(logTypeStr);
+            public JsonElement serialize(Bankaccount src, Type typeOfSrc, JsonSerializationContext context) {
+                if (src == null) return JsonNull.INSTANCE;
+                JsonObject obj = new JsonObject();
+                obj.addProperty("id", src.getId());
+                obj.addProperty("type", src.getType().name());
+                obj.addProperty("balance", src.getBalance());
+                if (src.getName() != null) {
+                    obj.addProperty("name", src.getName());
+                }
+                return obj;
+            }
+        });
+        
+        builder.registerTypeAdapter(Bankaccount.class, new JsonDeserializer<Bankaccount>() {
+            @Override
+            public Bankaccount deserialize(JsonElement json, Type typeOfT, JsonDeserializationContext context) throws JsonParseException {
+                if (json.isJsonNull()) return null;
                 
-                // Voor nu, altijd BalanceLogEntry gebruiken
-                return context.deserialize(json, BalanceLogEntry.class);
+                // Voor personal rekeningen (Essentials) returnen we null
+                // omdat deze niet via SDB Bank API worden opgeslagen
+                JsonObject obj = json.getAsJsonObject();
+                if (obj.has("type") && obj.get("type").getAsString().equals("PERSONAL")) {
+                    return null; // Personal rekeningen gebruiken Essentials
+                }
+                
+                // Voor andere rekening types proberen we de bankaccount op te halen
+                if (obj.has("id")) {
+                    int id = obj.get("id").getAsInt();
+                    if (BankUtils.getInstance() != null) {
+                        return BankUtils.getInstance().getBankAccount(id);
+                    }
+                }
+                
+                return null;
             }
         });
         
@@ -76,6 +112,23 @@ public class LogModule implements Module {
         });
         
         // Custom type adapter voor EnumMap in PlayerLog
+        builder.registerTypeAdapter(new TypeToken<EnumMap<PlayerLogType, List<LogEntry>>>(){}.getType(), new JsonSerializer<EnumMap<PlayerLogType, List<LogEntry>>>() {
+            @Override
+            public JsonElement serialize(EnumMap<PlayerLogType, List<LogEntry>> src, Type typeOfSrc, JsonSerializationContext context) {
+                JsonObject obj = new JsonObject();
+                for (Map.Entry<PlayerLogType, List<LogEntry>> entry : src.entrySet()) {
+                    if (entry.getValue() != null && !entry.getValue().isEmpty()) {
+                        JsonArray array = new JsonArray();
+                        for (LogEntry logEntry : entry.getValue()) {
+                            array.add(context.serialize(logEntry));
+                        }
+                        obj.add(entry.getKey().name(), array);
+                    }
+                }
+                return obj;
+            }
+        });
+        
         builder.registerTypeAdapter(new TypeToken<EnumMap<PlayerLogType, List<LogEntry>>>(){}.getType(), new JsonDeserializer<EnumMap<PlayerLogType, List<LogEntry>>>() {
             @Override
             public EnumMap<PlayerLogType, List<LogEntry>> deserialize(JsonElement json, Type typeOfT, JsonDeserializationContext context) throws JsonParseException {
@@ -106,7 +159,7 @@ public class LogModule implements Module {
                             }
                         } catch (IllegalArgumentException e) {
                             // Skip onbekende log types
-                            System.out.println("[MinetopiaSDB-HTC] Unknown log type: " + entry.getKey());
+                            System.out.println("[MinetopiaSDB-HTC] Warning: Unknown log type: " + entry.getKey());
                         }
                     }
                 }
@@ -124,8 +177,12 @@ public class LogModule implements Module {
         logsFolder = new File(plugin.getDataFolder(), "LOGS");
         if (!logsFolder.exists()) logsFolder.mkdirs();
         loadAll();
-        Bukkit.getScheduler().runTaskTimerAsynchronously(plugin, this::saveAll, 20*60*5, 20*60*5);
-        Bukkit.getScheduler().runTaskTimerAsynchronously(plugin, this::archiveOldLogs, 20*60*10, 20*60*10);
+        long saveInterval = ConfigModule.getInstance().getSaveIntervalMillis() / 50L; // ms to ticks
+        long archiveInterval = ConfigModule.getInstance().getArchiveIntervalMillis() / 50L;
+        if (saveInterval < 20) saveInterval = 20; // minimaal 1 seconde
+        if (archiveInterval < 20) archiveInterval = 20;
+        Bukkit.getScheduler().runTaskTimerAsynchronously(plugin, this::saveAll, saveInterval, saveInterval);
+        Bukkit.getScheduler().runTaskTimerAsynchronously(plugin, this::archiveOldLogs, archiveInterval, archiveInterval);
     }
 
     @Override
@@ -139,35 +196,61 @@ public class LogModule implements Module {
         if (log == null) {
             log = new PlayerLog(speler);
             playerLogs.put(speler, log);
-            System.out.println("[MinetopiaSDB-HTC] Created new PlayerLog for " + speler);
         }
         return log;
     }
 
     public void savePlayerLog(UUID speler) {
         PlayerLog log = getPlayerLog(speler);
-        if (log == null) return;
+        if (log == null) {
+            System.out.println("[MinetopiaSDB-HTC] Warning: Cannot save log for null player UUID");
+            return;
+        }
+        
         File file = getPlayerLogFile(speler);
         try (Writer writer = new OutputStreamWriter(new FileOutputStream(file), StandardCharsets.UTF_8)) {
-            gson.toJson(log, writer);
-            System.out.println("[MinetopiaSDB-HTC] Saved log for " + speler + " to " + file.getAbsolutePath());
+            String json = gson.toJson(log);
+            writer.write(json);
+            System.out.println("[MinetopiaSDB-HTC] Saved " + speler + " player logs met een totaal van " + log.getLogs().values().stream().mapToInt(List::size).sum() + " total entries");
         } catch (IOException e) {
+            System.out.println("[MinetopiaSDB-HTC] Error saving log for player " + speler + ": " + e.getMessage());
+            e.printStackTrace();
+        } catch (Exception e) {
+            System.out.println("[MinetopiaSDB-HTC] Unexpected error saving log for player " + speler + ": " + e.getMessage());
             e.printStackTrace();
         }
     }
 
     public void saveAll() {
+        System.out.println("[MinetopiaSDB-HTC] Saving all player logs...");
+        int savedCount = 0;
         for (UUID uuid : playerLogs.keySet()) {
-            savePlayerLog(uuid);
+            try {
+                savePlayerLog(uuid);
+                savedCount++;
+            } catch (Exception e) {
+                System.out.println("[MinetopiaSDB-HTC] Error saving log for player " + uuid + ": " + e.getMessage());
+            }
         }
+        System.out.println("[MinetopiaSDB-HTC] Saved " + savedCount + " player logs");
     }
 
     public void loadAll() {
-        if (logsFolder == null || !logsFolder.exists()) return;
+        if (logsFolder == null || !logsFolder.exists()) {
+            System.out.println("[MinetopiaSDB-HTC] Warning: Logs folder does not exist: " + logsFolder);
+            return;
+        }
+        
         File[] uuidFolders = logsFolder.listFiles(File::isDirectory);
-        if (uuidFolders == null) return;
+        if (uuidFolders == null) {
+            System.out.println("[MinetopiaSDB-HTC] Warning: No UUID folders found in logs directory");
+            return;
+        }
+        
+        System.out.println("[MinetopiaSDB-HTC] Loading logs from " + uuidFolders.length + " player folders...");
+        
         for (File uuidFolder : uuidFolders) {
-            File file = new File(uuidFolder, "BalanceLOG.json");
+            File file = new File(uuidFolder, "balancelog.json");
             if (file.exists()) {
                 try (Reader reader = new InputStreamReader(new FileInputStream(file), StandardCharsets.UTF_8)) {
                     PlayerLog log = gson.fromJson(reader, PlayerLog.class);
@@ -176,27 +259,41 @@ public class LogModule implements Module {
                         if (log.getLogs() == null) {
                             log = new PlayerLog(log.getSpeler());
                         }
+                        
+                        // Count total logs for debugging
+                        int totalLogs = 0;
+                        for (PlayerLogType type : PlayerLogType.values()) {
+                            totalLogs += log.getLogs(type).size();
+                        }
                         playerLogs.put(log.getSpeler(), log);
+                        System.out.println("[MinetopiaSDB-HTC] Loaded " + log.getSpeler() + " player logs met een totaal van " + totalLogs + " total entries");
+                    } else {
+                        System.out.println("[MinetopiaSDB-HTC] Warning: Invalid log data in " + file.getPath());
                     }
                 } catch (IOException e) {
+                    System.out.println("[MinetopiaSDB-HTC] Error reading log file " + file.getPath() + ": " + e.getMessage());
                     e.printStackTrace();
                 } catch (JsonParseException e) {
+                    System.out.println("[MinetopiaSDB-HTC] Corrupt log file detected: " + file.getPath());
                     // Log bestand is corrupt of incompatibel, backup maken en overschrijven
-                    System.out.println("[MinetopiaSDB-HTC] Corrupt log file detected: " + file.getAbsolutePath());
                     try {
-                        File backup = new File(file.getParentFile(), "BalanceLOG.json.backup." + System.currentTimeMillis());
+                        File backup = new File(file.getParentFile(), "balancelog.json.backup." + System.currentTimeMillis());
                         file.renameTo(backup);
-                        System.out.println("[MinetopiaSDB-HTC] Backup created: " + backup.getAbsolutePath());
+                        System.out.println("[MinetopiaSDB-HTC] Created backup: " + backup.getPath());
                     } catch (Exception backupError) {
+                        System.out.println("[MinetopiaSDB-HTC] Failed to create backup: " + backupError.getMessage());
                         backupError.printStackTrace();
                     }
                 } catch (Exception e) {
-                    // Andere errors, gewoon loggen
-                    System.out.println("[MinetopiaSDB-HTC] Error loading log file: " + file.getAbsolutePath());
+                    System.out.println("[MinetopiaSDB-HTC] Unexpected error loading log file " + file.getPath() + ": " + e.getMessage());
                     e.printStackTrace();
                 }
+            } else {
+                System.out.println("[MinetopiaSDB-HTC] No log file found for player folder: " + uuidFolder.getName());
             }
         }
+        
+        System.out.println("[MinetopiaSDB-HTC] Finished loading logs. Total players loaded: " + playerLogs.size());
     }
 
     public void archiveOldLogs() {
@@ -204,9 +301,10 @@ public class LogModule implements Module {
             PlayerLog log = playerLogs.get(uuid);
             if (log == null) continue;
             List<?> toArchive = new ArrayList<>();
-            LocalDateTime cutoff = LocalDateTime.now().minusHours(24);
+            long retentionMillis = ConfigModule.getInstance().getRetentionMillis();
+            LocalDateTime cutoff = LocalDateTime.now().minusNanos(retentionMillis * 1000000L);
             for (nl.djorr.MinetopiaSDBHTC.modules.log.type.BalanceLogEntry entry : log.getBalanceLogs()) {
-                if (entry.getTimestamp().isBefore(cutoff)) {
+                if (entry != null && entry.getTimestamp() != null && entry.getTimestamp().isBefore(cutoff)) {
                     ((List)toArchive).add(entry);
                 }
             }
@@ -238,13 +336,68 @@ public class LogModule implements Module {
     }
 
     private File getPlayerLogFile(UUID uuid) {
-        File uuidFolder = new File(logsFolder, uuid.toString());
+        File uuidFolder = new File(logsFolder, uuid.toString().toLowerCase());
         if (!uuidFolder.exists()) uuidFolder.mkdirs();
-        return new File(uuidFolder, "BalanceLOG.json");
+        return new File(uuidFolder, "balancelog.json");
     }
 
     public UUID getUUID(String spelerNaam) {
         OfflinePlayer offline = Bukkit.getOfflinePlayer(spelerNaam);
         return offline != null ? offline.getUniqueId() : null;
+    }
+
+    public List<BalanceLogEntry> getBalanceLogs(String spelerNaam, int maxUrenTerug) {
+        UUID uuid = getUUID(spelerNaam);
+        if (uuid == null) return new ArrayList<>();
+        PlayerLog log = getPlayerLog(uuid);
+        if (log == null) return new ArrayList<>();
+        long retentionMillis = ConfigModule.getInstance().getRetentionMillis();
+        LocalDateTime cutoff = LocalDateTime.now().minusNanos(retentionMillis * 1000000L);
+        List<BalanceLogEntry> recent = new ArrayList<>();
+        for (BalanceLogEntry entry : log.getBalanceLogs()) {
+            if (entry != null && entry.getTimestamp() != null && entry.getTimestamp().isAfter(cutoff)) {
+                recent.add(entry);
+            }
+        }
+        return recent;
+    }
+
+    public List<BalanceLogEntry> getEssEconomyLogs(String spelerNaam, int maxUrenTerug) {
+        UUID uuid = getUUID(spelerNaam);
+        if (uuid == null) return new ArrayList<>();
+        PlayerLog log = getPlayerLog(uuid);
+        if (log == null) return new ArrayList<>();
+        long retentionMillis = ConfigModule.getInstance().getRetentionMillis();
+        LocalDateTime cutoff = LocalDateTime.now().minusNanos(retentionMillis * 1000000L);
+        List<BalanceLogEntry> recent = new ArrayList<>();
+        for (BalanceLogEntry entry : log.getEssEconomyLogs()) {
+            if (entry != null && entry.getTimestamp() != null && entry.getTimestamp().isAfter(cutoff)) {
+                recent.add(entry);
+            }
+        }
+        return recent;
+    }
+
+    public List<BalanceLogEntry> getLogsOfType(String spelerNaam, PlayerLogType type, int maxUrenTerug) {
+        UUID uuid = getUUID(spelerNaam);
+        if (uuid == null) {
+            return new ArrayList<>();
+        }
+        PlayerLog log = getPlayerLog(uuid);
+        if (log == null) {
+            return new ArrayList<>();
+        }
+        long retentionMillis = ConfigModule.getInstance().getRetentionMillis();
+        LocalDateTime cutoff = LocalDateTime.now().minusNanos(retentionMillis * 1000000L);
+        List<BalanceLogEntry> result = new ArrayList<>();
+        List<LogEntry> logs = log.getLogs(type);
+        for (LogEntry entry : logs) {
+            if (entry != null && entry instanceof BalanceLogEntry) {
+                if (entry.getTimestamp() != null && entry.getTimestamp().isAfter(cutoff)) {
+                    result.add((BalanceLogEntry) entry);
+                }
+            }
+        }
+        return result;
     }
 } 

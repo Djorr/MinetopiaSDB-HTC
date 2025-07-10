@@ -5,10 +5,13 @@ import io.github.bananapuncher714.nbteditor.NBTEditor;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
+import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.Material;
 import net.ess3.api.IEssentials;
 import nl.minetopiasdb.api.enums.BankAccountType;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 
 public class BalanceUtils {
@@ -112,7 +115,11 @@ public class BalanceUtils {
     }
 
     public static ItemStack setLastOwner(ItemStack item, UUID spelerUuid) {
-        if (item == null || spelerUuid == null) return item;
+        if (item == null) return item;
+        if (spelerUuid == null) {
+            // Verwijder de tag
+            return NBTEditor.set(item, null, "sdb_lastowner");
+        }
         return NBTEditor.set(item, spelerUuid.toString(), "sdb_lastowner");
     }
     public static ItemStack setLastOwner(ItemStack item, String spelerNaam) {
