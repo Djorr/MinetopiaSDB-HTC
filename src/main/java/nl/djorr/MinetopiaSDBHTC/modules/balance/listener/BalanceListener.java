@@ -35,7 +35,6 @@ public class BalanceListener implements Listener {
     @EventHandler
     public void onDeposit(BankAccountDepositEvent event) {
         if (event.getPlayer() == null) {
-            System.out.println("[MinetopiaSDB-HTC] Warning: Player is null in BankAccountDepositEvent");
             return;
         }
         
@@ -55,13 +54,11 @@ public class BalanceListener implements Listener {
         
         // Voor andere rekening types gebruiken we SDB Bank API
         if (BankUtils.getInstance() == null) {
-            System.out.println("[MinetopiaSDB-HTC] Warning: BankUtils.getInstance() is null in BankAccountDepositEvent");
             return;
         }
         
         nl.minetopiasdb.api.banking.Bankaccount bankAccount = BankUtils.getInstance().getBankAccount(event.getAccountId());
         if (bankAccount == null) {
-            System.out.println("[MinetopiaSDB-HTC] Warning: Bank account is null for account ID: " + event.getAccountId());
             return;
         }
         
@@ -75,7 +72,6 @@ public class BalanceListener implements Listener {
     @EventHandler
     public void onWithdraw(BankAccountWithdrawEvent event) {
         if (event.getPlayer() == null) {
-            System.out.println("[MinetopiaSDB-HTC] Warning: Player is null in BankAccountWithdrawEvent");
             return;
         }
         
@@ -95,13 +91,11 @@ public class BalanceListener implements Listener {
         
         // Voor andere rekening types gebruiken we SDB Bank API
         if (BankUtils.getInstance() == null) {
-            System.out.println("[MinetopiaSDB-HTC] Warning: BankUtils.getInstance() is null in BankAccountWithdrawEvent");
             return;
         }
         
         Bankaccount bankAccount = BankUtils.getInstance().getBankAccount(event.getAccountId());
         if (bankAccount == null) {
-            System.out.println("[MinetopiaSDB-HTC] Warning: Bank account is null for account ID: " + event.getAccountId());
             return;
         }
         

@@ -159,7 +159,6 @@ public class LogModule implements Module {
                             }
                         } catch (IllegalArgumentException e) {
                             // Skip onbekende log types
-                            System.out.println("[MinetopiaSDB-HTC] Warning: Unknown log type: " + entry.getKey());
                         }
                     }
                 }
@@ -203,7 +202,6 @@ public class LogModule implements Module {
     public void savePlayerLog(UUID speler) {
         PlayerLog log = getPlayerLog(speler);
         if (log == null) {
-            System.out.println("[MinetopiaSDB-HTC] Warning: Cannot save log for null player UUID");
             return;
         }
         
@@ -211,43 +209,33 @@ public class LogModule implements Module {
         try (Writer writer = new OutputStreamWriter(new FileOutputStream(file), StandardCharsets.UTF_8)) {
             String json = gson.toJson(log);
             writer.write(json);
-            System.out.println("[MinetopiaSDB-HTC] Saved " + speler + " player logs met een totaal van " + log.getLogs().values().stream().mapToInt(List::size).sum() + " total entries");
+            // Removed per-player save log line
         } catch (IOException e) {
-            System.out.println("[MinetopiaSDB-HTC] Error saving log for player " + speler + ": " + e.getMessage());
             e.printStackTrace();
         } catch (Exception e) {
-            System.out.println("[MinetopiaSDB-HTC] Unexpected error saving log for player " + speler + ": " + e.getMessage());
             e.printStackTrace();
         }
     }
 
     public void saveAll() {
-        System.out.println("[MinetopiaSDB-HTC] Saving all player logs...");
-        int savedCount = 0;
         for (UUID uuid : playerLogs.keySet()) {
             try {
                 savePlayerLog(uuid);
-                savedCount++;
             } catch (Exception e) {
-                System.out.println("[MinetopiaSDB-HTC] Error saving log for player " + uuid + ": " + e.getMessage());
+                e.printStackTrace();
             }
         }
-        System.out.println("[MinetopiaSDB-HTC] Saved " + savedCount + " player logs");
     }
 
     public void loadAll() {
         if (logsFolder == null || !logsFolder.exists()) {
-            System.out.println("[MinetopiaSDB-HTC] Warning: Logs folder does not exist: " + logsFolder);
             return;
         }
         
         File[] uuidFolders = logsFolder.listFiles(File::isDirectory);
         if (uuidFolders == null) {
-            System.out.println("[MinetopiaSDB-HTC] Warning: No UUID folders found in logs directory");
             return;
         }
-        
-        System.out.println("[MinetopiaSDB-HTC] Loading logs from " + uuidFolders.length + " player folders...");
         
         for (File uuidFolder : uuidFolders) {
             File file = new File(uuidFolder, "balancelog.json");
@@ -259,41 +247,35 @@ public class LogModule implements Module {
                         if (log.getLogs() == null) {
                             log = new PlayerLog(log.getSpeler());
                         }
-                        
                         // Count total logs for debugging
                         int totalLogs = 0;
                         for (PlayerLogType type : PlayerLogType.values()) {
                             totalLogs += log.getLogs(type).size();
                         }
                         playerLogs.put(log.getSpeler(), log);
-                        System.out.println("[MinetopiaSDB-HTC] Loaded " + log.getSpeler() + " player logs met een totaal van " + totalLogs + " total entries");
+                        // Removed per-player load log line
                     } else {
-                        System.out.println("[MinetopiaSDB-HTC] Warning: Invalid log data in " + file.getPath());
+                        // System.out.println("[MinetopiaSDB-HTC] Warning: Invalid log data in " + file.getPath());
                     }
                 } catch (IOException e) {
-                    System.out.println("[MinetopiaSDB-HTC] Error reading log file " + file.getPath() + ": " + e.getMessage());
                     e.printStackTrace();
                 } catch (JsonParseException e) {
-                    System.out.println("[MinetopiaSDB-HTC] Corrupt log file detected: " + file.getPath());
+                    // System.out.println("[MinetopiaSDB-HTC] Corrupt log file detected: " + file.getPath());
                     // Log bestand is corrupt of incompatibel, backup maken en overschrijven
                     try {
                         File backup = new File(file.getParentFile(), "balancelog.json.backup." + System.currentTimeMillis());
                         file.renameTo(backup);
-                        System.out.println("[MinetopiaSDB-HTC] Created backup: " + backup.getPath());
                     } catch (Exception backupError) {
-                        System.out.println("[MinetopiaSDB-HTC] Failed to create backup: " + backupError.getMessage());
                         backupError.printStackTrace();
                     }
                 } catch (Exception e) {
-                    System.out.println("[MinetopiaSDB-HTC] Unexpected error loading log file " + file.getPath() + ": " + e.getMessage());
                     e.printStackTrace();
                 }
             } else {
-                System.out.println("[MinetopiaSDB-HTC] No log file found for player folder: " + uuidFolder.getName());
+                // System.out.println("[MinetopiaSDB-HTC] No log file found for player folder: " + uuidFolder.getName());
             }
         }
         
-        System.out.println("[MinetopiaSDB-HTC] Finished loading logs. Total players loaded: " + playerLogs.size());
     }
 
     public void archiveOldLogs() {

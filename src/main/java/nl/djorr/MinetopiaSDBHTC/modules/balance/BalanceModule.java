@@ -264,29 +264,25 @@ public class BalanceModule implements Module {
     public void addBalanceLog(UUID speler, String actie, double oudSaldo, double nieuwSaldo, Bankaccount bankAccount, double amount, int itemAmount, String itemType, Location location) {
         try {
             if (speler == null) {
-                System.out.println("[MinetopiaSDB-HTC] Warning: Cannot add balance log for null player UUID");
                 return;
             }
             
-            PlayerLog log = logModule.getPlayerLog(speler);
+        PlayerLog log = logModule.getPlayerLog(speler);
             if (log == null) {
-                System.out.println("[MinetopiaSDB-HTC] Warning: Could not get player log for UUID: " + speler);
                 return;
             }
             
-            PlayerLogType logType = PlayerLogType.BALANCE;
+        PlayerLogType logType = PlayerLogType.BALANCE;
 
-            BalanceLogEntry entry = new BalanceLogEntry(
-                    speler, logType, actie, bankAccount, oudSaldo, nieuwSaldo, amount, itemAmount, itemType, location
-            );
+        BalanceLogEntry entry = new BalanceLogEntry(
+                speler, logType, actie, bankAccount, oudSaldo, nieuwSaldo, amount, itemAmount, itemType, location
+        );
 
-            log.getLogs(logType).add(entry);
-            logModule.savePlayerLog(speler);
+        log.getLogs(logType).add(entry);
+        logModule.savePlayerLog(speler);
             sendLogToDiscord(entry);
             
-            System.out.println("[MinetopiaSDB-HTC] Added balance log: " + actie + " (Oud: €" + oudSaldo + " → Nieuw: €" + nieuwSaldo + ")");
         } catch (Exception e) {
-            System.out.println("[MinetopiaSDB-HTC] Error adding balance log for player " + speler + ": " + e.getMessage());
             e.printStackTrace();
         }
     }
@@ -294,47 +290,42 @@ public class BalanceModule implements Module {
     public void addBalanceLog(Player player, @Nullable Player target, String actie, double oudSaldo, double nieuwSaldo, PlayerLogType type, Location location) {
         try {
             if (player == null) {
-                System.out.println("[MinetopiaSDB-HTC] Warning: Cannot add balance log for null player");
                 return;
             }
             
-            PlayerLog log = logModule.getPlayerLog(player.getUniqueId());
+        PlayerLog log = logModule.getPlayerLog(player.getUniqueId());
             if (log == null) {
-                System.out.println("[MinetopiaSDB-HTC] Warning: Could not get player log for player: " + player.getName());
                 return;
             }
 
-            switch (type) {
-                case PICKUP:
-                case DROP: {
-                    BalanceLogEntry entry = new BalanceLogEntry(
-                            player.getUniqueId(), type, actie, oudSaldo, nieuwSaldo
-                    );
-                    if (target != null) entry.setTarget(target.getUniqueId());
-                    if (location != null) entry.setLocation(location);
-                    log.getLogs(type).add(entry);
-                    logModule.savePlayerLog(player.getUniqueId());
+        switch (type) {
+            case PICKUP:
+            case DROP: {
+                BalanceLogEntry entry = new BalanceLogEntry(
+                        player.getUniqueId(), type, actie, oudSaldo, nieuwSaldo
+                );
+                if (target != null) entry.setTarget(target.getUniqueId());
+                if (location != null) entry.setLocation(location);
+                log.getLogs(type).add(entry);
+                logModule.savePlayerLog(player.getUniqueId());
                     sendLogToDiscord(entry);
-                    System.out.println("[MinetopiaSDB-HTC] Added " + type.name() + " log: " + actie);
-                    break;
-                }
-                case INVENTORY:
-                    break;
-                case ESS_ECONOMY: {
-                    BalanceLogEntry entry = new BalanceLogEntry(
-                            player.getUniqueId(), type, actie, oudSaldo, nieuwSaldo
-                    );
-                    if (target != null) entry.setTarget(target.getUniqueId());
-                    if (location != null) entry.setLocation(location);
-                    log.getLogs(type).add(entry);
-                    logModule.savePlayerLog(player.getUniqueId());
-                    sendLogToDiscord(entry);
-                    System.out.println("[MinetopiaSDB-HTC] Added ESS_ECONOMY log: " + actie + " (Oud: €" + oudSaldo + " → Nieuw: €" + nieuwSaldo + ")");
-                    break;
-                }
+                break;
             }
+            case INVENTORY:
+                break;
+            case ESS_ECONOMY: {
+                BalanceLogEntry entry = new BalanceLogEntry(
+                        player.getUniqueId(), type, actie, oudSaldo, nieuwSaldo
+                );
+                if (target != null) entry.setTarget(target.getUniqueId());
+                if (location != null) entry.setLocation(location);
+                log.getLogs(type).add(entry);
+                logModule.savePlayerLog(player.getUniqueId());
+                    sendLogToDiscord(entry);
+                break;
+            }
+        }
         } catch (Exception e) {
-            System.out.println("[MinetopiaSDB-HTC] Error adding balance log for player " + (player != null ? player.getName() : "null") + ": " + e.getMessage());
             e.printStackTrace();
         }
     }
@@ -342,30 +333,26 @@ public class BalanceModule implements Module {
     public void addPickupDropLog(UUID uuid, String actie, double oudSaldo, double nieuwSaldo, PlayerLogType logType, double amount, int itemCount, String itemType, Location location, UUID originalOwner) {
         try {
             if (uuid == null) {
-                System.out.println("[MinetopiaSDB-HTC] Warning: Cannot add pickup/drop log for null UUID");
                 return;
             }
-            PlayerLog log = logModule.getPlayerLog(uuid);
+        PlayerLog log = logModule.getPlayerLog(uuid);
             if (log == null) {
-                System.out.println("[MinetopiaSDB-HTC] Warning: Could not get player log for UUID: " + uuid);
                 return;
             }
-            BalanceLogEntry entry = new BalanceLogEntry(
-                    uuid, logType, actie
-            );
-            entry.setOudSaldo(oudSaldo);
-            entry.setNieuwSaldo(nieuwSaldo);
-            entry.setAmount(amount);
-            entry.setItemAmount(itemCount);
-            entry.setItemType(itemType);
-            entry.setLocation(location);
+        BalanceLogEntry entry = new BalanceLogEntry(
+                uuid, logType, actie
+        );
+        entry.setOudSaldo(oudSaldo);
+        entry.setNieuwSaldo(nieuwSaldo);
+        entry.setAmount(amount);
+        entry.setItemAmount(itemCount);
+        entry.setItemType(itemType);
+        entry.setLocation(location);
             entry.setTarget(originalOwner); // Gebruik target als originalOwner voor pickup
-            log.getLogs(logType).add(entry);
-            logModule.savePlayerLog(uuid);
+        log.getLogs(logType).add(entry);
+        logModule.savePlayerLog(uuid);
             sendLogToDiscord(entry);
-            System.out.println("[MinetopiaSDB-HTC] Added " + logType.name() + " log: " + actie + " (Amount: €" + amount + ")");
         } catch (Exception e) {
-            System.out.println("[MinetopiaSDB-HTC] Error adding pickup/drop log for UUID " + uuid + ": " + e.getMessage());
             e.printStackTrace();
         }
     }
